@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Regional GDP by Region</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="scripts\NzRegionGDPBarChartSimple.js"></script>
+
+  <style>
+    .note {
+      font-size: 18;
+      color: #555;
+      text-align: left;
+      margin-top: 20px;
+    }
+  </style>
+
+</head>
+<body>
+  <h1>Regional Gross Domestic Products - New Zealand</h1>
+  <svg id="NzRegionGDPBarChartSimple" width="800" height="400"></svg>
+  <p>
+    <div class="note">Values are in millions of NZ Dollars.</div>
+</p>
+<script>
+    buildNZregionalGDPBarChartSimple("#NzRegionGDPBarChartSimple");
+</script>
+  
+</body>
+</html>
