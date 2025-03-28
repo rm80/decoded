@@ -1,4 +1,4 @@
-
+    //<![CDATA[
 function buildNZregionalGDPBarChartSimple(svgid) {
     const csvUrl = "https://raw.githubusercontent.com/rm80/decoded/refs/heads/main/data/statsnz/regional-gross-domestic-product-year-ended-march-2024.csv";
 
@@ -70,3 +70,4 @@ function buildNZregionalGDPBarChartSimple(svgid) {
       console.error("Error loading the CSV file:", error);
     });
 }
+ //]]>
