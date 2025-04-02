@@ -23,7 +23,7 @@ function BuildCharts(svgId) {
             d.Group === "Gross domestic product, by region and industry" &&
             d.Series_title_3 === "Gross Domestic Product" &&
             d.Period === "2024.03" &&
-            !["New Zealand", "Total North Island", "Total south Island"].includes(d.Series_title_2)
+            !["New Zealand", "Total North Island", "Total South Island"].includes(d.Series_title_2)
         );
 
         // Convert Data_value to numbers
