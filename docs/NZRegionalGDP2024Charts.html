@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>New Zealand Regional GDP 2024</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <script src="scripts/dscharts.js"></script>
+    <link rel="stylesheet" href="styles/chartstyles.css">    
+</head>
+<body>
+    <h2>New Zealand Regional GDP 2024</h2>
+    <div id="chart-container">
+        <!-- Predefined SVG where the chart will be drawn -->
+        <div id="chart">
+            <svg width="1000" height="500">
+                <g id="chart-group" transform="translate(80,50)"></g>
+            </svg>
+        </div>
+    </div>
+
+    
+    <script>
+        // Ensure BuildCharts is called only after DOM and scripts are fully loaded
+        document.addEventListener("DOMContentLoaded", function () {
+            BuildCharts("chart");
+        });
+
+        // Resize chart dynamically when window resizes
+        window.addEventListener("resize", () => {
+            d3.select("#chart-group").selectAll("*").remove();
+            BuildCharts("chart");
+        };
+    </script>
+</body>
+</html>
