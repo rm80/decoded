@@ -4,31 +4,157 @@
     <title>New Zealand Regional GDP 2024</title>
     <script src="https://d3js.org/d3.v6.min.js"></script>
     <script src="scripts/dscharts.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/save-svg-as-png/1.4.17/saveSvgAsPng.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
     <link rel="stylesheet" href="styles/chartstyles.css">    
 </head>
 <body>
-    <h2>New Zealand Regional GDP 2024</h2>
-    <div id="chart-container">
-        <!-- Predefined SVG where the chart will be drawn -->
-        <div id="chart">
-            <svg width="1000" height="500">
-                <g id="chart-group" transform="translate(80,50)"></g>
+    <div id="uberChartContainer">
+
+        <div class="chart-container" id="NZRegionalGDP2024-chart">
+            <h3>New Zealand Regional GDP 2024 (Provisional)</h3>
+            <svg width="900" height="400">
+                <g id="NZRegionalGDP2024" transform="translate(80,50)"></g>
             </svg>
         </div>
-    </div>
+            
+        <div class="chart-container" id="NorthIslandRegionalData2024-chart">
+            <h3>North Island Regional GDP 2024 (Provisional)</h3>
+            <svg width="900" height="400">
+                <g id="NorthIslandRegionalData2024" transform="translate(80,50)"></g>
+            </svg>
+        </div>
+        
+        <div class="chart-container" id="SouthIslandRegionalData2024-chart">
+            <h3>South Island Regional GDP 2024 (Provisional)</h3>
+            <svg width="900" height="400">
+                <g id="SouthIslandRegionalData2024" transform="translate(80,50)"></g>
+            </svg>
+        </div>
 
+        <div class="chart-container" id="NZRegionalGDP2024PerCapita-chart">
+            <h3>All Regions - GDP per Capita (Provisional)</h3>
+            <svg width="900" height="400">
+                <g id="NZRegionalGDP2024PerCapita" transform="translate(80,50)"></g>
+            </svg>
+        </div>
+        
+        <div class="chart-container" id="NorthIslandRegionalData2024PerCapita-chart">
+            <h3>North Island - GDP per Capita (Provisional)</h3>
+            <svg width="900" height="400">
+                <g id="NorthIslandRegionalData2024PerCapita" transform="translate(80,50)"></g>
+            </svg>
+        </div>
+        
+        <div class="chart-container" id="SouthIslandRegionalData2024PerCapita-chart">
+            <h3>South Island - GDP per Capita (Provisional)</h3>
+            <svg width="900" height="400">
+                <g id="SouthIslandRegionalData2024PerCapita" transform="translate(80,50)"></g>
+            </svg>
+        </div>
+    
+ </div>
+
+    <button onclick="downloadAllContainers()">Download All Charts</button>
+    
     
     <script>
-        // Ensure BuildCharts is called only after DOM and scripts are fully loaded
         document.addEventListener("DOMContentLoaded", function () {
-            BuildCharts("chart");
+            (async () => {
+                const regionMeta = await d3.csv("https://raw.githubusercontent.com/rm80/decoded/refs/heads/main/data/statsnz/New%20Zealand%20Regions.csv");
+        
+                
+                const northRegions = regionMeta.filter(d => d["Regions Group"] === "North Island").map(d => d.Region);
+                const southRegions = regionMeta.filter(d => d["Regions Group"] === "South Island").map(d => d.Region);
+                const allRegions = [...new Set([...northRegions, ...southRegions])]; // remove duplicates just in case               
+                
+                // GDP Charts
+                BuildCharts("NZRegionalGDP2024", allRegions, "gdp-asc", "Gross Domestic Product");
+                BuildCharts("NorthIslandRegionalData2024", northRegions, "gdp-asc", "Gross Domestic Product");
+                BuildCharts("SouthIslandRegionalData2024", southRegions, "gdp-asc", "Gross Domestic Product");
+
+                // per capita charts
+                BuildCharts("NZRegionalGDP2024PerCapita", allRegions, "gdp-asc", "GDP per capita");
+                BuildCharts("NorthIslandRegionalData2024PerCapita", northRegions, "gdp-asc", "GDP per capita");
+                BuildCharts("SouthIslandRegionalData2024PerCapita", southRegions, "gdp-asc", "GDP per capita");                            
+                        
+            })();
         });
 
+              
+        
+        function downloadAllContainers() {
+            const containers = document.querySelectorAll(".chart-container");
+        
+            containers.forEach((container, index) => {
+                setTimeout(() => {
+                    html2canvas(container, {
+                        scale: 2,
+                        backgroundColor: "#ffffff",
+                        useCORS: true,
+                        padding: 0,
+                        scrollX: 0,
+                        scrollY: 0
+                    }).then(canvas => {
+                        const cropped = cropCanvas(canvas);
+                        const link = document.createElement("a");
+                        const filename = container.id ? `${container.id}.png` : `chart-${index + 1}.png`;
+                        link.download = filename;
+                        link.href = canvas.toDataURL("image/png");
+                        link.click();
+                    });
+                }, index * 1200); // Slight delay to avoid collisions
+            });
+        }
+        
+        function cropCanvas(canvas) {
+            const ctx = canvas.getContext("2d");
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const { data, width, height } = imageData;
+        
+            let top = null, bottom = null, left = null, right = null;
+        
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const idx = (y * width + x) * 4;
+                    const alpha = data[idx + 3];
+                    const isWhite = data[idx] > 240 && data[idx + 1] > 240 && data[idx + 2] > 240;
+        
+                    if (alpha > 0 && !isWhite) {
+                        if (top === null) top = y;
+                        bottom = y;
+                        if (left === null || x < left) left = x;
+                        if (right === null || x > right) right = x;
+                    }
+                }
+            }
+        
+            if (top === null) return canvas; // fallback: no visible pixels found
+        
+            const croppedWidth = right - left + 1;
+            const croppedHeight = bottom - top + 1;
+        
+            const croppedCanvas = document.createElement("canvas");
+            croppedCanvas.width = croppedWidth;
+            croppedCanvas.height = croppedHeight;
+        
+            const croppedCtx = croppedCanvas.getContext("2d");
+            croppedCtx.drawImage(canvas, left, top, croppedWidth, croppedHeight, 0, 0, croppedWidth, croppedHeight);
+        
+            return croppedCanvas;
+        }
+        
+        /*
         // Resize chart dynamically when window resizes
         window.addEventListener("resize", () => {
             d3.select("#chart-group").selectAll("*").remove();
-            BuildCharts("chart");
+            //BuildCharts("chart", regionMeta);
+            BuildCharts("north-chart", northRegions);
+            BuildCharts("south-chart", southRegions);
+
         });
+        */
     </script>
 </body>
 </html>
