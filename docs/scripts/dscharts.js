@@ -1,6 +1,23 @@
-function BuildCharts(svgId) {
+function applySorting(data, sortOption) {
+    switch (sortOption) {
+        case "alphabetical-asc":
+            return data.sort((a, b) => a.Series_title_2.localeCompare(b.Series_title_2));
+        case "alphabetical-desc":
+            return data.sort((a, b) => b.Series_title_2.localeCompare(a.Series_title_2));
+        case "gdp-asc":
+            return data.sort((a, b) => a.Data_value - b.Data_value);
+        case "gdp-desc":
+            return data.sort((a, b) => b.Data_value - a.Data_value);
+        default:
+            return data; // No sorting
+    }
+}
+
+
+function BuildCharts(groupId, regionList, sortOption = "none", metric = "Gross Domestic Product") {
+
     // URL to fetch the CSV data
-    const dataUrl = "https://raw.githubusercontent.com/rm80/decoded/refs/heads/main/data/statsnz/regional-gross-domestic-product-year-ended-march-2024.csv";
+    const regionalData2024Url = "https://raw.githubusercontent.com/rm80/decoded/refs/heads/main/data/statsnz/regional-gross-domestic-product-year-ended-march-2024.csv";
 
     // Dimensions and margins
     const margin = { top: 50, right: 50, bottom: 100, left: 80 },
@@ -8,8 +25,7 @@ function BuildCharts(svgId) {
           height = 400 - margin.top - margin.bottom;
 
     // Select the existing SVG and chart group
-    const svg = d3.select(`#${svgId}`).select("svg");
-    const chartGroup = svg.select("#chart-group");
+    const chartGroup = d3.select(`#${groupId}`);
 
     // Tooltip setup
     const tooltip = d3.select("body")
@@ -17,19 +33,40 @@ function BuildCharts(svgId) {
                       .attr("class", "tooltip");
 
     // Fetch and process the CSV data
-    d3.csv(dataUrl).then(data => {
+    d3.csv(regionalData2024Url).then(data => {
+        
         // Filter data based on required conditions
-        const filteredData = data.filter(d =>
-            d.Group === "Gross domestic product, by region and industry" &&
-            d.Series_title_3 === "Gross Domestic Product" &&
-            d.Period === "2024.03" &&
-            !["New Zealand", "Total North Island", "Total South Island"].includes(d.Series_title_2)
-        );
+        // const filteredData = data.filter(d =>
+        //     d.Group === "Gross domestic product, by region and industry" &&
+        //     d.Series_title_3 === metric &&
+        //     d.Period === "2024.03" &&
+        //     regionList.map(r => r.trim().toLowerCase()).includes(d.Series_title_2.trim().toLowerCase())
+        // );
 
+        const filteredData = data.filter(d => {
+            const groupName = d.Group?.trim().toLowerCase();
+            const metricLower = metric.trim().toLowerCase();
+        
+            const isGdp = metricLower === "gross domestic product" &&
+                          groupName === "gross domestic product, by region and industry" &&
+                          d.Series_title_3?.trim().toLowerCase() === "gross domestic product";           
+
+            const isPerCapita = metricLower === "gdp per capita" &&
+                                groupName === "gross domestic product per person, by region" &&
+                                (!d.Series_title_3 || d.Series_title_3.trim() === "");            
+        
+            return d.Period === "2024.03" &&
+                   regionList.map(r => r.trim().toLowerCase()).includes(d.Series_title_2.trim().toLowerCase()) &&
+                   (isGdp || isPerCapita);
+        });
+                            
         // Convert Data_value to numbers
         filteredData.forEach(d => {
             d.Data_value = +d.Data_value;
         });
+
+        // Apply sorting
+        const sortedData = applySorting(filteredData, sortOption);
 
         // X and Y scales
         const x = d3.scaleBand()
