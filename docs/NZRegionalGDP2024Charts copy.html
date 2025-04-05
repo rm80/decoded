@@ -1,0 +1,64 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>New Zealand Regional GDP 2024 - Final Layout</title>
+
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <!-- <script src="scripts/GDPCharting_final_fixedLayout.js"></script> -->
+    <script src="scripts/GDPCharting_renderSmallMultiples_withSort.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/save-svg-as-png/1.4.17/saveSvgAsPng.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <link rel="stylesheet" href="styles/chartstyles.css">
+    
+</head>
+<body>
+    <div id="uberChartContainer">
+
+       
+
+        <h3>Regional GDP Trends (2000–2024)</h3>
+        <div id="regionalGDPTrends" style="display: flex; flex-wrap: wrap; gap: 12px;"></div>
+
+        <h3>Regional per Capita GDP Trends (2000–2024)</h3>
+        <div id="regionalTrendsPerCapitaGDP" style="display: flex; flex-wrap: wrap; gap: 12px;"></div>
+        
+    
+ </div>
+
+    <button onclick="downloadAllContainers()">Download All Charts</button>
+
+    <script type="module">
+        document.addEventListener("DOMContentLoaded", async () => {
+            const regionMeta = await d3.csv("https://raw.githubusercontent.com/rm80/decoded/refs/heads/main/data/statsnz/New%20Zealand%20Regions.csv");
+
+            const allRegions = regionMeta.map(d => d.Region);
+            const northRegions = regionMeta.filter(d => d["Regions Group"] === "North Island").map(d => d.Region);
+            const southRegions = regionMeta.filter(d => d["Regions Group"] === "South Island").map(d => d.Region);
+
+
+           
+           
+           await GDPCharting.renderSmallMultiples({
+                containerId: "regionalGDPTrends",
+                metric: "Gross Domestic Product", // or "GDP per capita"
+                startYear: 2000,
+                endYear: 2024,
+                width: 220,
+                height: 120
+            }); 
+
+            
+            await GDPCharting.renderSmallMultiples({
+                containerId: "regionalTrendsPerCapitaGDP",
+                metric: "GDP per capita", // or "GDP per capita"
+                startYear: 2000,
+                endYear: 2024,
+                width: 220,
+                height: 120
+            });            
+        });
+    </script>
+</body>
+</html>

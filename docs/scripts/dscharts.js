@@ -172,3 +172,138 @@ function BuildCharts(groupId, regionList, sortOption = "none", metric = "Gross D
         console.error("Error loading or parsing data:", error);
     });
 }
+
+function downloadAllContainers() {
+    const containers = document.querySelectorAll(".chart-container");
+
+    containers.forEach((container, index) => {
+        setTimeout(() => {
+            html2canvas(container, {
+                scale: 2,
+                backgroundColor: "#ffffff",
+                useCORS: true,
+                padding: 0,
+                scrollX: 0,
+                scrollY: 0
+            }).then(canvas => {
+                const cropped = cropCanvas(canvas);
+                const link = document.createElement("a");
+                const filename = container.id ? `${container.id}.png` : `chart-${index + 1}.png`;
+                link.download = filename;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            });
+        }, index * 1200); // Slight delay to avoid collisions
+    });
+}
+
+function cropCanvas(canvas) {
+    const ctx = canvas.getContext("2d");
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const { data, width, height } = imageData;
+
+    let top = null, bottom = null, left = null, right = null;
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4;
+            const alpha = data[idx + 3];
+            const isWhite = data[idx] > 240 && data[idx + 1] > 240 && data[idx + 2] > 240;
+
+            if (alpha > 0 && !isWhite) {
+                if (top === null) top = y;
+                bottom = y;
+                if (left === null || x < left) left = x;
+                if (right === null || x > right) right = x;
+            }
+        }
+    }
+
+    if (top === null) return canvas; // fallback: no visible pixels found
+
+    const croppedWidth = right - left + 1;
+    const croppedHeight = bottom - top + 1;
+
+    const croppedCanvas = document.createElement("canvas");
+    croppedCanvas.width = croppedWidth;
+    croppedCanvas.height = croppedHeight;
+
+    const croppedCtx = croppedCanvas.getContext("2d");
+    croppedCtx.drawImage(canvas, left, top, croppedWidth, croppedHeight, 0, 0, croppedWidth, croppedHeight);
+
+    return croppedCanvas;
+}
+
+async function renderSmallMultiples() {
+    const dataURL = "https://raw.githubusercontent.com/rm80/decoded/refs/heads/main/data/statsnz/regional-gross-domestic-product-year-ended-march-2024.csv";
+
+    const data = await d3.csv(dataURL);
+
+    const filtered = data.filter(d =>
+        d.Group?.trim().toLowerCase() === "gross domestic product, by region and industry" &&
+        d.Series_title_3?.trim().toLowerCase() === "gross domestic product"
+    );
+
+    const parsed = filtered.map(d => ({
+        year: +d.Period.split(".")[0],
+        region: d.Series_title_2,
+        gdp: +d.Data_value
+    }));
+
+    const regions = Array.from(new Set(parsed.map(d => d.region))).sort();
+
+    const container = d3.select("#small-multiples-container");
+    const width = 220, height = 120, margin = { top: 20, right: 10, bottom: 20, left: 40 };
+
+    regions.forEach(region => {
+        const regionData = parsed.filter(d => d.region === region).sort((a, b) => a.year - b.year);
+
+        const svg = container.append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .style("background", "#f9f9f9")
+            .style("border", "1px solid #ccc")
+            .style("box-shadow", "0 1px 2px rgba(0,0,0,0.1)");
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleLinear()
+            .domain(d3.extent(regionData, d => d.year))
+            .range([0, width - margin.left - margin.right]);
+
+        const y = d3.scaleLinear()
+            .domain([0, d3.max(regionData, d => d.gdp)])
+            .nice()
+            .range([height - margin.top - margin.bottom, 0]);
+
+        const line = d3.line()
+            .x(d => x(d.year))
+            .y(d => y(d.gdp));
+
+        g.append("path")
+            .datum(regionData)
+            .attr("fill", "none")
+            .attr("stroke", "#1976d2")
+            .attr("stroke-width", 2)
+            .attr("d", line);
+
+        g.append("text")
+            .attr("x", (width - margin.left - margin.right) / 2)
+            .attr("y", -8)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "12px")
+            .text(region);
+
+        // Optional: last GDP value label
+        const last = regionData[regionData.length - 1];
+        g.append("text")
+            .attr("x", x(last.year))
+            .attr("y", y(last.gdp))
+            .attr("dx", "4px")
+            .attr("dy", "0.35em")
+            .attr("font-size", "10px")
+            .attr("fill", "#444")
+            .text(`$${Math.round(last.gdp / 1e3)}B`);
+    });
+}
+

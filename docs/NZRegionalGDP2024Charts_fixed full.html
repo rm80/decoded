@@ -6,7 +6,7 @@
 
     <script src="https://d3js.org/d3.v6.min.js"></script>
     <!-- <script src="scripts/GDPCharting_final_fixedLayout.js"></script> -->
-    <script src="scripts/GDPCharting.js"></script>
+    <script src="scripts/GDPCharting_final_fixedLayout_withMultiples.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/save-svg-as-png/1.4.17/saveSvgAsPng.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -138,11 +138,11 @@
                 height: 400
             });
 
-           GDPCharting.renderSmallMultiples({
+            GDPCharting.renderSmallMultiples({
                 containerId: "regionalGDPTrends",
                 metric: "Gross Domestic Product", // or "GDP per capita"
                 startYear: 2000,
-                endYear: 2001,
+                endYear: 2024,
                 width: 220,
                 height: 120
             });
@@ -151,7 +151,7 @@
                 containerId: "regionalTrendsPerCapitaGDP",
                 metric: "GDP per capita", // or "GDP per capita"
                 startYear: 2000,
-                endYear: 2001,
+                endYear: 2024,
                 width: 220,
                 height: 120
             });            
