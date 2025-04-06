@@ -1,0 +1,132 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>NZ Regional GDP – YoY Growth Heatmap</title>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script src="scripts/GDPCharting.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/save-svg-as-png/1.4.17/saveSvgAsPng.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <link rel="stylesheet" href="styles/chartstyles.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 30px;
+    }
+    .heatmap {
+      font-size: 12px;
+    }
+    .axis text {
+      font-size: 11px;
+    }
+    .cell {
+      stroke: #fff;
+      stroke-width: 1px;
+    }
+    .tooltip {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      padding: 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0;
+    }
+    .legend {
+      font-size: 12px;
+      text-anchor: middle;
+    }
+  </style>
+</head>
+<body>
+  <h1>New Zealand Regional GDP Year on Year Growth Heatmaps</h1>
+  
+  <div class="chart-container" id="NZRegionalGDPYoYGrowthHeatmap-chart">
+    <h2>New Zealand Regional GDP YoY Growth Heatmap by Region</h2>
+    <svg id="NZRegionalGDPYoYGrowthHeatmap" width="800" height="550"></svg>
+  </div>
+
+  <div class="chart-container" id="NorthIslandGDPYoYGrowthHeatmap-chart">
+    <h2>North islanfd GDP YoY Growth Heatmap by Region</h2>
+    <svg id="NorthIslandGDPYoYGrowthHeatmap" width="800" height="550"></svg>
+  </div>
+
+  <div class="chart-container" id="SouthorthIslandGDPYoYGrowthHeatmap-chart">
+    <h2>South Island GDP YoY Growth Heatmap by Region</h2>
+    <svg id="SouthorthIslandGDPYoYGrowthHeatmap" width="800" height="550"></svg>
+  </div>
+
+  <div class="chart-container" id="NZRegionalGDPPerCapitaYoYGrowthHeatmap-chart">
+    <h2>New Zealand Regional GDP Per Capita YoY Growth Heatmap by Region</h2>
+    <svg id="NZRegionalGDPPerCapitaYoYGrowthHeatmap" width="800" height="550"></svg>
+  </div>
+
+  <div class="chart-container" id="NorthIslandGDPerCapitaYoYGrowthHeatmap-chart">
+    <h2>North Island GDP Per Capita YoY Growth Heatmap by Region</h2>
+    <svg id="NorthIslandGDPerCapitaYoYGrowthHeatmap" width="800" height="550"></svg>
+  </div>
+
+  <div class="chart-container" id="SouthorthIslandGDPerCapitaYoYGrowthHeatmap-chart">
+    <h2>South Island GDP Per Capita YoY Growth Heatmap by Region</h2>
+    <svg id="SouthorthIslandGDPerCapitaYoYGrowthHeatmap" width="800" height="550"></svg>
+  </div>
+
+
+  <div id="tooltip" class="heatmap-tooltip"></div>
+
+  <div><button onclick="downloadAllContainers()">Download All Charts</button></div>
+
+  <script type="module">
+    document.addEventListener("DOMContentLoaded", async () => {
+
+    const regionMeta = await d3.csv("https://raw.githubusercontent.com/rm80/decoded/main/data/statsnz/New%20Zealand%20Regions.csv");
+
+    const allRegions = regionMeta.map(d => d.Region);
+    const northRegions = regionMeta.filter(d => d["Regions Group"] === "North Island").map(d => d.Region);
+    const southRegions = regionMeta.filter(d => d["Regions Group"] === "South Island").map(d => d.Region);
+
+    GDPCharting.renderYoYGrowthHeatmap({
+      containerId: "NZRegionalGDPYoYGrowthHeatmap",
+      metric: "Gross Domestic Product",
+      regionList: allRegions
+    });
+
+    GDPCharting.renderYoYGrowthHeatmap({
+      containerId: "NorthIslandGDPYoYGrowthHeatmap",
+      metric: "Gross Domestic Product",
+      regionList: northRegions
+    });
+
+    GDPCharting.renderYoYGrowthHeatmap({
+      containerId: "SouthorthIslandGDPYoYGrowthHeatmap",
+      metric: "Gross Domestic Product",
+      regionList: southRegions
+    });
+
+    GDPCharting.renderYoYGrowthHeatmap({
+      containerId: "NZRegionalGDPPerCapitaYoYGrowthHeatmap",
+      metric: "",
+      regionList: allRegions
+    });
+
+    GDPCharting.renderYoYGrowthHeatmap({
+      containerId: "NorthIslandGDPerCapitaYoYGrowthHeatmap",
+      metric: "",
+      regionList: northRegions
+    });
+
+    GDPCharting.renderYoYGrowthHeatmap({
+      containerId: "SouthorthIslandGDPerCapitaYoYGrowthHeatmap",
+      metric: "",
+      regionList: southRegions
+    });
+
+    
+    const tooltip = d3.select("#heatmap-tooltip");
+  });
+  </script>
+</body>
+</html>
