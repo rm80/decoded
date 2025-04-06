@@ -3,6 +3,7 @@ body {
     background-color: #f4f4f9;
     margin: 0;
     padding: 0;
+}    
 
 h2 {
     text-align: center;
@@ -80,3 +81,25 @@ h2 {
     width: fit-content;
   }
   
+  .dumbellplot-tooltip {
+    position: absolute;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    font-size: 12px;
+    border-radius: 4px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .heatmap-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    padding: 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    opacity: 0;
+  }

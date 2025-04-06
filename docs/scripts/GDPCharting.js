@@ -72,7 +72,7 @@ const GDPCharting = (function () {
             region: d.Series_title_2,
             group: d.Group?.trim().toLowerCase(),
             metric: d.Series_title_3?.trim().toLowerCase() || "",
-            value: +d.Data_value
+            value: +d.Data_value * Math.pow(10, +d.MAGNTUDE) // 👈 MAGNTUDE is the SCALING 
         })).filter(d => !isNaN(d.value));
         return dataset;
     }
@@ -109,6 +109,19 @@ const GDPCharting = (function () {
         }
     }
 
+    function getSmartTickFormatter(maxValue) {
+        if (maxValue >= 1_000_000_000) {
+            return d => `$${(d / 1_000_000_000).toFixed(1)}B`;
+        } else if (maxValue >= 1_000_000) {
+            return d => `$${(d / 1_000_000).toFixed(1)}M`;
+        } else if (maxValue >= 1_000) {
+            return d => `$${(d / 1_000).toFixed(1)}K`;
+        } else {
+            return d => `$${d.toFixed(0)}`;
+        }
+    }
+    
+
     async function renderBarChart({
         containerId,
         regionList,
@@ -144,11 +157,12 @@ const GDPCharting = (function () {
             .range([0, innerW])
             .padding(0.3);
     
+        const maxValue = d3.max(latest, d => d.value);
         const y = d3.scaleLinear()
-            .domain([0, d3.max(sorted, d => d.value)])
+            .domain([0, maxValue])
             .nice()
             .range([innerH, 0]);
-    
+
         const color = d3.scaleOrdinal(d3.schemeCategory10).domain(sorted.map(d => d.region));
     
         chart.selectAll(".bar")
@@ -195,7 +209,7 @@ const GDPCharting = (function () {
             .style("text-anchor", "end");
     
         chart.append("g")
-            .call(d3.axisLeft(y).ticks(10).tickFormat(d => `$${d.toLocaleString()}`));
+         .call(d3.axisLeft(y).ticks(10).tickFormat(getSmartTickFormatter(maxValue)));
     }
     
 
@@ -266,11 +280,239 @@ const GDPCharting = (function () {
         });
     }
 
+    async function renderDumbbellPlot({
+        containerId = "dumbbellPlot",
+        metric = "Gross Domestic Product",
+        startYear = 2000,
+        endYear = 2024,
+        sort = "growth-desc",
+        regionList = null
+    }) {
+
+        console.log("Rendering dumbbell plot...");
+        
+        const svg = d3.select("#" + containerId);
+        svg.selectAll("*").remove();
+        
+        const tooltip = d3.select("#tooltip");
+
+        const width = +svg.attr("width");
+        const height = +svg.attr("height");
+        const margin = { top: 50, right: 80, bottom: 50, left: 150 };
+        const innerW = width - margin.left - margin.right;
+        const innerH = height - margin.top - margin.bottom;
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const data = await loadData();
+        const group = metric === "GDP per capita"
+            ? "gross domestic product per person, by region"
+            : "gross domestic product, by region and industry";
+
+        const filtered = filterData({ metric, group, regionList, startYear, endYear })
+            .filter(d => d.year === startYear || d.year === endYear);
+
+            const grouped = d3.groups(filtered, d => d.region).map(([region, values]) => {
+                const start = values.find(d => d.year === startYear);
+                const end = values.find(d => d.year === endYear);
+                if (!start || !end) return null;
+            
+                return {
+                    region,
+                    start: start.value,
+                    end: end.value,
+                    growth: ((end.value - start.value) / start.value) * 100
+                };
+            }).filter(d => d);
+            
+
+        const sorted = sortData(grouped, sort);
+
+        const y = d3.scaleBand()
+            .domain(sorted.map(d => d.region))
+            .range([0, innerH])
+            .padding(0.4);
+
+        const maxValue = d3.max(sorted, d => Math.max(d.start, d.end));
+        const x = d3.scaleLinear()
+            .domain([0, maxValue])
+            .nice()
+            .range([0, innerW]);
+
+        g.append("g").call(d3.axisLeft(y));
+        g.append("g")
+        .attr("transform", `translate(0,${innerH})`)
+        .call(d3.axisBottom(x).tickFormat(getSmartTickFormatter(maxValue)));
+
+        g.selectAll(".line")
+            .data(sorted)
+            .enter()
+            .append("line")
+            .attr("x1", d => x(d.start))
+            .attr("x2", d => x(d.end))
+            .attr("y1", d => y(d.region) + y.bandwidth()/2)
+            .attr("y2", d => y(d.region) + y.bandwidth()/2)
+            .attr("stroke", "#888")
+            .attr("stroke-width", 2);
+
+        g.selectAll(".circle-start")
+            .data(sorted)
+            .enter()
+            .append("circle")
+            .attr("cx", d => x(d.start))
+            .attr("cy", d => y(d.region) + y.bandwidth()/2)
+            .attr("r", 6)
+            .attr("fill", "#2196f3")
+            .on("mouseover", (e,d) => {
+                tooltip.transition().style("opacity", 1);
+                tooltip.html(`<strong>${d.region}</strong><br>Start (${startYear}): $${d3.format(",")(d.start)}`)
+                    .style("left", e.pageX + 10 + "px")
+                    .style("top", e.pageY - 30 + "px");
+            })
+            .on("mouseout", () => tooltip.transition().style("opacity", 0));
+
+        g.selectAll(".circle-end")
+            .data(sorted)
+            .enter()
+            .append("circle")
+            .attr("cx", d => x(d.end))
+            .attr("cy", d => y(d.region) + y.bandwidth()/2)
+            .attr("r", 6)
+            .attr("fill", "#4caf50")
+            .on("mouseover", (e,d) => {
+                tooltip.transition().style("opacity", 1);
+                tooltip.html(`<strong>${d.region}</strong><br>End (${endYear}): $${d3.format(",")(d.end)}<br>Growth: ${d.growth.toFixed(1)}%`)
+                    .style("left", e.pageX + 10 + "px")
+                    .style("top", e.pageY - 30 + "px");
+            })
+            .on("mouseout", () => tooltip.transition().style("opacity", 0));
+    }
+
+    async function renderYoYGrowthHeatmap({
+        containerId,
+        metric = "Gross Domestic Product",
+        regionList = null,
+        startYear = 2001,
+        endYear = 2024
+      }) {
+        const svg = d3.select("#" + containerId);
+        svg.selectAll("*").remove();
+        const tooltip = d3.select("#tooltip");
+    
+        const width = +svg.attr("width");
+        const height = +svg.attr("height");
+        const margin = { top: 50, right: 50, bottom: 100, left: 120 };
+        const innerW = width - margin.left - margin.right;
+        const innerH = height - margin.top - margin.bottom;
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+    
+        const colorScale = d3.scaleSequential()
+          .interpolator(d3.interpolateRdYlGn)
+          .domain([-10, 10]);
+    
+        const dataURL = "https://raw.githubusercontent.com/rm80/decoded/main/data/statsnz/regional-gross-domestic-product-year-ended-march-2024.csv";
+        const raw = await d3.csv(dataURL);
+    
+        const dataset = raw.map(d => ({
+          year: +d.Period.split(".")[0],
+          region: d.Series_title_2,
+          group: d.Group?.trim().toLowerCase(),
+          metric: d.Series_title_3?.trim().toLowerCase() || "",
+          value: +d.Data_value * Math.pow(10, +d.MAGNTUDE)
+        })).filter(d =>
+          d.group === "gross domestic product, by region and industry" &&
+          d.metric === "gross domestic product" &&
+          !isNaN(d.value)
+        );
+    
+        const grouped = d3.groups(dataset, d => d.region).map(([region, values]) => {
+          if (regionList && !regionList.includes(region)) return [];
+          const rows = values.filter(d => d.year >= startYear - 1 && d.year <= endYear).sort((a, b) => a.year - b.year);
+          const result = [];
+          for (let i = 1; i < rows.length; i++) {
+            const prev = rows[i - 1];
+            const curr = rows[i];
+            const growth = ((curr.value - prev.value) / prev.value) * 100;
+            result.push({ region, year: curr.year, growth });
+          }
+          return result;
+        }).flat().filter(d => d);
+    
+        const years = [...new Set(grouped.map(d => d.year))].sort((a, b) => a - b);
+        const regions = [...new Set(grouped.map(d => d.region))].sort();
+    
+        const x = d3.scaleBand().domain(years).range([0, innerW]).padding(0.05);
+        const y = d3.scaleBand().domain(regions).range([0, innerH]).padding(0.05);
+    
+        g.append("g").call(d3.axisLeft(y)).selectAll("text").style("font-size", "11px");
+    
+        g.append("g")
+          .attr("transform", `translate(0, ${innerH})`)
+          .call(d3.axisBottom(x).tickFormat(d3.format("d")))
+          .selectAll("text")
+          .attr("transform", "rotate(-45)")
+          .style("text-anchor", "end")
+          .style("font-size", "11px");
+    
+        g.selectAll(".cell")
+          .data(grouped)
+          .enter()
+          .append("rect")
+          .attr("class", "cell")
+          .attr("x", d => x(d.year))
+          .attr("y", d => y(d.region))
+          .attr("width", x.bandwidth())
+          .attr("height", y.bandwidth())
+          .attr("fill", d => colorScale(d.growth))
+          .on("mouseover", (event, d) => {
+            tooltip.transition().duration(200).style("opacity", 1);
+            tooltip.html(`<strong>${d.region}</strong><br>${d.year}: ${d.growth.toFixed(2)}%`)
+              .style("left", (event.pageX + 10) + "px")
+              .style("top", (event.pageY - 30) + "px");
+          })
+          .on("mouseout", () => tooltip.transition().duration(300).style("opacity", 0));
+    
+        // Legend
+        const legendWidth = 300;
+        const legendHeight = 12;
+        const legendX = innerW / 2 - legendWidth / 2;
+    
+        const defs = svg.append("defs");
+        const gradient = defs.append("linearGradient").attr("id", "legend-gradient");
+        gradient.selectAll("stop")
+          .data([
+            { offset: "0%", color: colorScale(-10) },
+            { offset: "50%", color: colorScale(0) },
+            { offset: "100%", color: colorScale(10) }
+          ])
+          .enter().append("stop")
+          .attr("offset", d => d.offset)
+          .attr("stop-color", d => d.color);
+    
+        svg.append("g")
+          .attr("transform", `translate(${margin.left + legendX}, ${margin.top + innerH + 50})`)
+          .append("rect")
+          .attr("width", legendWidth)
+          .attr("height", legendHeight)
+          .style("fill", "url(#legend-gradient)");
+    
+        const legendScale = d3.scaleLinear().domain([-10, 10]).range([0, legendWidth]);
+        const legendAxis = d3.axisBottom(legendScale).ticks(5).tickFormat(d => `${d}%`);
+    
+        svg.append("g")
+          .attr("transform", `translate(${margin.left + legendX}, ${margin.top + innerH + 50 + legendHeight})`)
+          .call(legendAxis)
+          .selectAll("text")
+          .style("font-size", "11px");
+      }
+
     return {
         loadData,
         filterData,
         sortData,
         renderBarChart,
-        renderSmallMultiples
+        renderSmallMultiples,
+        renderDumbbellPlot,
+        renderYoYGrowthHeatmap
     };
 })();
