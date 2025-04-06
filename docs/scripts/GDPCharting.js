@@ -59,6 +59,7 @@ function cropCanvas(canvas) {
     return croppedCanvas;
 }
 
+
 const GDPCharting = (function () {
     let dataset = null;
 
@@ -90,82 +91,68 @@ const GDPCharting = (function () {
             const isPerCapita = metricLower === "gdp per capita" &&
                                 groupName === "gross domestic product per person, by region" &&
                                 d.metric === "";
-            
-            if (isGdp && d.region === "Auckland") {
-                console.log({
-                    region: d.region,
-                    year: d.year,
-                    group: d.group,
-                    metric: d.metric,
-                    isGdp,
-                    isPerCapita,
-                    regionMatch,
-                    yearMatch,
-                    included: regionMatch && yearMatch && (isGdp || isPerCapita)
-                });
-                
-            }
-            
-                                                    
-            if (isPerCapita && d.region === "Auckland") {
-                console.log({
-                    region: d.region,
-                    year: d.year,
-                    group: d.group,
-                    metric: d.metric,
-                    isGdp,
-                    isPerCapita,
-                    regionMatch,
-                    yearMatch,
-                    included: regionMatch && yearMatch && (isGdp || isPerCapita)
-                });
 
-                console.log(" check condition:", regionMatch && yearMatch && (isGdp || isPerCapita));
-                
-            }
-
-            // if ((isGdp || isPerCapita) && d.year > endYear) {
-            //     console.warn(`INVALID YEAR FILTER: ${d.region}, ${d.year}, expected <= ${endYear}`);
-            // }
-            
             return regionMatch && yearMatch && (isGdp || isPerCapita);
         });
     }
 
-    async function renderBarChart({ containerId, regionList, metric = "Gross Domestic Product", year = 2024, sort = "gdp-desc", showLine = false, width = 900, height = 400 }) {
+    function sortData(data, sortOption) {
+        switch (sortOption) {
+            case "alphabetical":
+                return data.sort((a, b) => a.region.localeCompare(b.region));
+            case "gdp-desc":
+                return data.sort((a, b) => b.value - a.value);
+            case "gdp-asc":
+                return data.sort((a, b) => a.value - b.value);
+            default:
+                return data;
+        }
+    }
+
+    async function renderBarChart({
+        containerId,
+        regionList,
+        metric = "Gross Domestic Product",
+        year = 2024,
+        sort = "gdp-desc",
+        showLine = false,
+        width = 900,
+        height = 400
+    }) {
         const data = await loadData();
         const group = metric === "GDP per capita"
             ? "gross domestic product per person, by region"
             : "gross domestic product, by region and industry";
-
+    
         const filtered = filterData({ metric, group, regionList, startYear: year, endYear: year });
         const latest = filtered.filter(d => d.year === year);
-
+        const sorted = sortData(latest, sort); // ✅ Apply sorting
+    
         const margin = { top: 50, right: 50, bottom: 100, left: 80 };
         const innerW = width - margin.left - margin.right;
         const innerH = height - margin.top - margin.bottom;
-
+    
         const svg = d3.select(`#${containerId}`);
         svg.selectAll("*").remove();
         svg.attr("width", width).attr("height", height);
-
+    
         const chart = svg.append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
-
+    
         const x = d3.scaleBand()
-            .domain(latest.map(d => d.region))
+            .domain(sorted.map(d => d.region))
             .range([0, innerW])
             .padding(0.3);
-
+    
         const y = d3.scaleLinear()
-            .domain([0, d3.max(latest, d => d.value)])
+            .domain([0, d3.max(sorted, d => d.value)])
             .nice()
             .range([innerH, 0]);
-
-        const color = d3.scaleOrdinal(d3.schemeCategory10).domain(latest.map(d => d.region));
-
+    
+        const color = d3.scaleOrdinal(d3.schemeCategory10).domain(sorted.map(d => d.region));
+    
         chart.selectAll(".bar")
-            .data(latest)
+            .data(sorted)
             .enter()
             .append("rect")
             .attr("class", "bar")
@@ -174,21 +161,21 @@ const GDPCharting = (function () {
             .attr("width", x.bandwidth())
             .attr("height", d => innerH - y(d.value))
             .attr("fill", d => color(d.region));
-
+    
         if (showLine) {
             const line = d3.line()
                 .x(d => x(d.region) + x.bandwidth() / 2)
                 .y(d => y(d.value));
-
+    
             chart.append("path")
-                .datum(latest)
+                .datum(sorted)
                 .attr("fill", "none")
                 .attr("stroke", "red")
                 .attr("stroke-width", 2)
                 .attr("d", line);
-
+    
             chart.selectAll(".dot")
-                .data(latest)
+                .data(sorted)
                 .enter()
                 .append("circle")
                 .attr("class", "dot")
@@ -199,17 +186,18 @@ const GDPCharting = (function () {
                 .attr("stroke", "red")
                 .attr("stroke-width", 1.5);
         }
-
+    
         chart.append("g")
             .attr("transform", `translate(0,${innerH})`)
             .call(d3.axisBottom(x))
             .selectAll("text")
             .attr("transform", "rotate(-45)")
             .style("text-anchor", "end");
-
+    
         chart.append("g")
             .call(d3.axisLeft(y).ticks(10).tickFormat(d => `$${d.toLocaleString()}`));
     }
+    
 
     async function renderSmallMultiples({
         containerId,
@@ -220,7 +208,8 @@ const GDPCharting = (function () {
         height = 120
     }) {
 
-        const container = d3.select(`#${containerId}`);
+        const container = d3.select(`#${containerId}`);    
+     
         container.selectAll("*").remove();
 
         const group = metric === "GDP per capita"
@@ -229,19 +218,14 @@ const GDPCharting = (function () {
 
         const data = await loadData();
         const filtered = filterData({ metric, group, startYear, endYear });
-        
-        console.log("GROUP: ", group);
-        console.log("FILTERED for " + metric + ": ", filtered.map(d => ({
-            region: d.region,
-            year: d.year,
-            value: d.value,
-            metric: d.metric
-        })));
 
-        const grouped = d3.groups(filtered, d => d.region);
+        const grouped = d3.groups(filtered, d => d.region);        
+
         const margin = { top: 20, right: 10, bottom: 20, left: 40 };
 
         grouped.forEach(([region, values]) => {
+            const sortedValues = [...values].sort((a, b) => a.year - b.year);
+
             const svg = container.append("svg")
                 .attr("width", width)
                 .attr("height", height)
@@ -252,11 +236,11 @@ const GDPCharting = (function () {
             const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
             const x = d3.scaleLinear()
-                .domain(d3.extent(values, d => d.year))
+                .domain(d3.extent(sortedValues, d => d.year))
                 .range([0, width - margin.left - margin.right]);
 
             const y = d3.scaleLinear()
-                .domain([0, d3.max(values, d => d.value)])
+                .domain([0, d3.max(sortedValues, d => d.value)])
                 .nice()
                 .range([height - margin.top - margin.bottom, 0]);
 
@@ -265,7 +249,7 @@ const GDPCharting = (function () {
                 .y(d => y(d.value));
 
             g.append("path")
-                .datum(values.sort((a, b) => a.year - b.year))
+                .datum(sortedValues)
                 .attr("fill", "none")
                 .attr("stroke", "#1976d2")
                 .attr("stroke-width", 2)
@@ -277,12 +261,15 @@ const GDPCharting = (function () {
                 .attr("text-anchor", "middle")
                 .attr("font-size", "12px")
                 .text(region);
+         
+
         });
     }
 
     return {
         loadData,
         filterData,
+        sortData,
         renderBarChart,
         renderSmallMultiples
     };

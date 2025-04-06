@@ -60,6 +60,7 @@ function cropCanvas(canvas) {
 }
 
 const GDPCharting = (function () {
+
     let dataset = null;
 
     async function loadData() {
@@ -95,40 +96,67 @@ const GDPCharting = (function () {
         });
     }
 
-    async function renderBarChart({ containerId, regionList, metric = "Gross Domestic Product", year = 2024, sort = "gdp-desc", showLine = false, width = 900, height = 400 }) {
+    function sortData(data, sortOption) {
+        switch (sortOption) {
+            case "alphabetical":
+                return data.sort((a, b) => a.region.localeCompare(b.region));
+            case "gdp-desc":
+                return data.sort((a, b) => b.value - a.value);
+            case "gdp-asc":
+                return data.sort((a, b) => a.value - b.value);
+            case "growth-desc":
+                return data.sort((a, b) => (b.growth || 0) - (a.growth || 0));
+            case "growth-asc":
+                return data.sort((a, b) => (a.growth || 0) - (b.growth || 0));
+            default:
+                return data;       
+        }
+    }
+
+    async function renderBarChart({
+        containerId,
+        regionList,
+        metric = "Gross Domestic Product",
+        year = 2024,
+        sort = "gdp-desc",
+        showLine = false,
+        width = 900,
+        height = 400
+    }) {
         const data = await loadData();
         const group = metric === "GDP per capita"
             ? "gross domestic product per person, by region"
             : "gross domestic product, by region and industry";
-
+    
         const filtered = filterData({ metric, group, regionList, startYear: year, endYear: year });
         const latest = filtered.filter(d => d.year === year);
-
+        const sorted = sortData(latest, sort); // ✅ Apply sorting
+    
         const margin = { top: 50, right: 50, bottom: 100, left: 80 };
         const innerW = width - margin.left - margin.right;
         const innerH = height - margin.top - margin.bottom;
-
+    
         const svg = d3.select(`#${containerId}`);
         svg.selectAll("*").remove();
         svg.attr("width", width).attr("height", height);
-
+    
         const chart = svg.append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
-
+    
         const x = d3.scaleBand()
-            .domain(latest.map(d => d.region))
+            .domain(sorted.map(d => d.region))
             .range([0, innerW])
             .padding(0.3);
-
+    
         const y = d3.scaleLinear()
-            .domain([0, d3.max(latest, d => d.value)])
+            .domain([0, d3.max(sorted, d => d.value)])
             .nice()
             .range([innerH, 0]);
-
-        const color = d3.scaleOrdinal(d3.schemeCategory10).domain(latest.map(d => d.region));
-
+    
+        const color = d3.scaleOrdinal(d3.schemeCategory10).domain(sorted.map(d => d.region));
+    
         chart.selectAll(".bar")
-            .data(latest)
+            .data(sorted)
             .enter()
             .append("rect")
             .attr("class", "bar")
@@ -137,21 +165,21 @@ const GDPCharting = (function () {
             .attr("width", x.bandwidth())
             .attr("height", d => innerH - y(d.value))
             .attr("fill", d => color(d.region));
-
+    
         if (showLine) {
             const line = d3.line()
                 .x(d => x(d.region) + x.bandwidth() / 2)
                 .y(d => y(d.value));
-
+    
             chart.append("path")
-                .datum(latest)
+                .datum(sorted)
                 .attr("fill", "none")
                 .attr("stroke", "red")
                 .attr("stroke-width", 2)
                 .attr("d", line);
-
+    
             chart.selectAll(".dot")
-                .data(latest)
+                .data(sorted)
                 .enter()
                 .append("circle")
                 .attr("class", "dot")
@@ -162,17 +190,18 @@ const GDPCharting = (function () {
                 .attr("stroke", "red")
                 .attr("stroke-width", 1.5);
         }
-
+    
         chart.append("g")
             .attr("transform", `translate(0,${innerH})`)
             .call(d3.axisBottom(x))
             .selectAll("text")
             .attr("transform", "rotate(-45)")
             .style("text-anchor", "end");
-
+    
         chart.append("g")
             .call(d3.axisLeft(y).ticks(10).tickFormat(d => `$${d.toLocaleString()}`));
     }
+    
 
     async function renderSmallMultiples({
         containerId,
@@ -182,7 +211,9 @@ const GDPCharting = (function () {
         width = 220,
         height = 120
     }) {
-        const container = d3.select(`#${containerId}`);
+
+        const container = d3.select(`#${containerId}`);    
+     
         container.selectAll("*").remove();
 
         const group = metric === "GDP per capita"
@@ -192,10 +223,13 @@ const GDPCharting = (function () {
         const data = await loadData();
         const filtered = filterData({ metric, group, startYear, endYear });
 
-        const grouped = d3.groups(filtered, d => d.region);
+        const grouped = d3.groups(filtered, d => d.region);        
+
         const margin = { top: 20, right: 10, bottom: 20, left: 40 };
 
         grouped.forEach(([region, values]) => {
+            const sortedValues = [...values].sort((a, b) => a.year - b.year);
+
             const svg = container.append("svg")
                 .attr("width", width)
                 .attr("height", height)
@@ -206,11 +240,11 @@ const GDPCharting = (function () {
             const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
             const x = d3.scaleLinear()
-                .domain(d3.extent(values, d => d.year))
+                .domain(d3.extent(sortedValues, d => d.year))
                 .range([0, width - margin.left - margin.right]);
 
             const y = d3.scaleLinear()
-                .domain([0, d3.max(values, d => d.value)])
+                .domain([0, d3.max(sortedValues, d => d.value)])
                 .nice()
                 .range([height - margin.top - margin.bottom, 0]);
 
@@ -219,7 +253,7 @@ const GDPCharting = (function () {
                 .y(d => y(d.value));
 
             g.append("path")
-                .datum(values.sort((a, b) => a.year - b.year))
+                .datum(sortedValues)
                 .attr("fill", "none")
                 .attr("stroke", "#1976d2")
                 .attr("stroke-width", 2)
@@ -231,13 +265,133 @@ const GDPCharting = (function () {
                 .attr("text-anchor", "middle")
                 .attr("font-size", "12px")
                 .text(region);
+         
+
         });
     }
+ 
 
+async function renderDumbbellPlot({
+        containerId = "dumbbellPlot",
+        metric = "Gross Domestic Product",
+        startYear = 2000,
+        endYear = 2024,
+        sort = "growth-desc",
+        regionList = null
+    }) {
+
+        console.log("Rendering dumbbell plot...");
+        
+        const svg = d3.select("#" + containerId);
+        svg.selectAll("*").remove();
+        
+        const tooltip = d3.select("#tooltip");
+
+        const width = +svg.attr("width");
+        const height = +svg.attr("height");
+        const margin = { top: 50, right: 80, bottom: 50, left: 150 };
+        const innerW = width - margin.left - margin.right;
+        const innerH = height - margin.top - margin.bottom;
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const data = await loadData();
+        const group = metric === "GDP per capita"
+            ? "gross domestic product per person, by region"
+            : "gross domestic product, by region and industry";
+
+        const filtered = filterData({ metric, group, regionList, startYear, endYear })
+            .filter(d => d.year === startYear || d.year === endYear);
+
+            const grouped = d3.groups(filtered, d => d.region).map(([region, values]) => {
+                const start = values.find(d => d.year === startYear);
+                const end = values.find(d => d.year === endYear);
+                if (!start || !end) return null;
+            
+                return {
+                    region,
+                    start: start.value,
+                    end: end.value,
+                    growth: ((end.value - start.value) / start.value) * 100
+                };
+            }).filter(d => d);
+            
+
+        const sorted = sortData(grouped, sort);
+
+        const y = d3.scaleBand()
+            .domain(sorted.map(d => d.region))
+            .range([0, innerH])
+            .padding(0.4);
+
+        const x = d3.scaleLinear()
+            .domain([0, d3.max(sorted, d => Math.max(d.start, d.end))])
+            .nice()
+            .range([0, innerW]);
+
+        g.append("g").call(d3.axisLeft(y));
+        g.append("g")
+            .attr("transform", `translate(0,${innerH})`)
+            .call(d3.axisBottom(x).tickFormat(d => `$${d3.format(",")(d)}`));
+
+        g.selectAll(".line")
+            .data(sorted)
+            .enter()
+            .append("line")
+            .attr("x1", d => x(d.start))
+            .attr("x2", d => x(d.end))
+            .attr("y1", d => y(d.region) + y.bandwidth()/2)
+            .attr("y2", d => y(d.region) + y.bandwidth()/2)
+            .attr("stroke", "#888")
+            .attr("stroke-width", 2);
+
+        g.selectAll(".circle-start")
+            .data(sorted)
+            .enter()
+            .append("circle")
+            .attr("cx", d => x(d.start))
+            .attr("cy", d => y(d.region) + y.bandwidth()/2)
+            .attr("r", 6)
+            .attr("fill", "#2196f3")
+            .on("mouseover", (e,d) => {
+                tooltip.transition().style("opacity", 1);
+                tooltip.html(`<strong>${d.region}</strong><br>Start (${startYear}): $${d3.format(",")(d.start)}`)
+                    .style("left", e.pageX + 10 + "px")
+                    .style("top", e.pageY - 30 + "px");
+            })
+            .on("mouseout", () => tooltip.transition().style("opacity", 0));
+
+        g.selectAll(".circle-end")
+            .data(sorted)
+            .enter()
+            .append("circle")
+            .attr("cx", d => x(d.end))
+            .attr("cy", d => y(d.region) + y.bandwidth()/2)
+            .attr("r", 6)
+            .attr("fill", "#4caf50")
+            .on("mouseover", (e,d) => {
+                tooltip.transition().style("opacity", 1);
+                tooltip.html(`<strong>${d.region}</strong><br>End (${endYear}): $${d3.format(",")(d.end)}<br>Growth: ${d.growth.toFixed(1)}%`)
+                    .style("left", e.pageX + 10 + "px")
+                    .style("top", e.pageY - 30 + "px");
+            })
+            .on("mouseout", () => tooltip.transition().style("opacity", 0));
+    }
     return {
         loadData,
         filterData,
+        sortData,
         renderBarChart,
-        renderSmallMultiples
+        renderSmallMultiples,
+        renderDumbbellPlot
     };
 })();
+    
+    // export const GDPCharting = {
+    //     loadData,
+    //     filterData,
+    //     sortData,
+    //     renderBarChart,
+    //     renderSmallMultiples,
+    //     renderDumbbellPlot       
+    // };
